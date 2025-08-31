@@ -27,6 +27,12 @@ if "money_history" not in st.session_state:
     st.session_state.money_history = [st.session_state.money]
 if "rounds_data" not in st.session_state:
     st.session_state.rounds_data = []
+if "round_locked" not in st.session_state:
+    st.session_state.round_locked = False
+if "outcomes" not in st.session_state:
+    st.session_state.outcomes = {}
+if "selected_choice" not in st.session_state:
+    st.session_state.selected_choice = None
 
 # -------------------------------
 # Real Singapore data 2010-2020
@@ -86,45 +92,58 @@ if st.session_state.round <= 10:
     st.write(f"GDP Growth: {scenario['GDP']}% | Inflation: {scenario['Inflation']}%")
     st.write(f"Economic Situation: {scenario['Situation']}")
 
-    # Player choice
-    choice = st.radio("Choose your action:", ["Spend", "Save", "Invest"])
+    if not st.session_state.round_locked:
+        # Player choice
+        choice = st.radio("Choose your action:", ["Spend", "Save", "Invest"])
+        if st.button("Submit Choice"):
+            # Calculate outcomes for all options
+            outcomes = {}
+            for action in ["Spend", "Save", "Invest"]:
+                money_change = 0
+                if action == "Spend":
+                    money_change = -random.randint(50, 150) - scenario['Inflation']*5
+                elif action == "Save":
+                    money_change = random.randint(20, 50)
+                elif action == "Invest":
+                    if scenario['GDP'] > 2:
+                        money_change = random.randint(100, 200)
+                    else:
+                        money_change = -random.randint(50, 150)
+                outcomes[action] = st.session_state.money + money_change
 
-    if st.button("Submit Choice"):
-        money_change = 0
-        outcome_text = ""
+            st.session_state.outcomes = outcomes
+            st.session_state.selected_choice = choice
+            st.session_state.round_locked = True
 
-        if choice == "Spend":
-            money_change = -random.randint(50, 150) - scenario['Inflation'] * 5
-            outcome_text = f"You spent money. Lost ${-money_change}."
-        elif choice == "Save":
-            money_change = random.randint(20, 50)
-            outcome_text = f"You saved money. Gained ${money_change}."
-        elif choice == "Invest":
-            if scenario['GDP'] > 2:
-                money_change = random.randint(100, 200)
-                outcome_text = f"Your investment succeeded! Gained ${money_change}."
-            else:
-                money_change = -random.randint(50, 150)
-                outcome_text = f"Your investment failed. Lost ${-money_change}."
+    else:
+        st.write(f"You chose: **{st.session_state.selected_choice}**")
+        st.write("### Possible outcomes:")
+        for action, amount in st.session_state.outcomes.items():
+            st.write(f"- If you had chosen **{action}**: ${amount}")
 
-        st.session_state.money += money_change
-        st.session_state.money_history.append(st.session_state.money)
-
-        st.session_state.history.append({
-            "Round": st.session_state.round,
-            "Year": scenario['Year'],
-            "Choice": choice,
-            "MoneyChange": money_change,
-            "GDP": scenario['GDP'],
-            "Inflation": scenario['Inflation'],
-            "Situation": scenario['Situation'],
-            "Tip": scenario['Tip']
-        })
-
-        st.write(outcome_text)
         st.info(f"Learning Tip: {scenario['Tip']}")
-        st.session_state.round += 1
-        st.rerun()
+
+        if st.button("Continue"):
+            st.session_state.money = st.session_state.outcomes[st.session_state.selected_choice]
+            st.session_state.money_history.append(st.session_state.money)
+
+            # Save history
+            st.session_state.history.append({
+                "Round": st.session_state.round,
+                "Year": scenario['Year'],
+                "Choice": st.session_state.selected_choice,
+                "MoneyChange": st.session_state.money - st.session_state.money_history[-2],
+                "GDP": scenario['GDP'],
+                "Inflation": scenario['Inflation'],
+                "Situation": scenario['Situation'],
+                "Tip": scenario['Tip']
+            })
+
+            st.session_state.round += 1
+            st.session_state.round_locked = False
+            st.session_state.selected_choice = None
+            st.session_state.outcomes = {}
+            st.rerun()
 
 # -------------------------------
 # End of game
@@ -150,4 +169,7 @@ else:
         st.session_state.history = []
         st.session_state.money_history = [1000]
         st.session_state.rounds_data = []
+        st.session_state.round_locked = False
+        st.session_state.outcomes = {}
+        st.session_state.selected_choice = None
         st.rerun()
